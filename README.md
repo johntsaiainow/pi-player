@@ -1,45 +1,61 @@
+Here is the complete, professional English version of the README.md. It covers both Standalone CLI execution and Yocto Embedded Integration, along with detailed features and command-line instructions.
+
+Markdown
 # Pi Player (`pi-player`)
 
-A lightweight, terminal-based FLAC & MP3 audio player built specifically for embedded Linux and Yocto environments (such as Raspberry Pi with Voice HAT). It features recursive directory navigation, terminal cover art rendering via `chafa`, and pure-audio playback via `mpv` to bypass hardware video driver initialization errors in headless setups.
+`pi-player` is a lightweight, terminal-based FLAC & MP3 audio player engineered specifically for embedded Linux systems (such as the Raspberry Pi) and TTY console environments.
+
+It features **recursive directory navigation**, **terminal cover art rendering (via `chafa`)**, and **one-key playback interruption**. By enforcing pure-audio parameters in `mpv`, it completely prevents console crashes caused by video driver initialization failures when playing files with embedded album artwork in headless setups.
 
 ---
 
-## Features
+## 🌟 Key Features
 
-- **Multi-Format Support**: Plays `.flac` and `.mp3` files seamlessly.
-- **Embedded Cover Art Support**: Automatically extracts cover art from ID3 (MP3) or Vorbis comments (FLAC) using `mutagen`.
-- **Terminal Rendering**: Displays album covers directly in the TTY console using `chafa`.
-- **Headless & Driver-Safe**: Configured with `mpv` audio-only flags (`--vid=no --vo=null --ao=alsa`) to prevent console crashes caused by embedded cover art.
-- **Recursive Directory Browsing**: Automatically scans `./Music`, `/root/music`, or subdirectories for album folders and lets you switch between them easily.
-- **Interactive Controls**:
-  - `q` during playback: Stops current track and returns to the album menu.
-  - `m` on track menu: Switch/move to another album folder.
-  - `q` on menu: Exit player with clear restart instructions.
+1. **Dual-Format Support & Tag Parsing (FLAC & MP3)**:
+   - Scans and plays both `.flac` and `.mp3` files seamlessly.
+   - Integrates `mutagen` parsing to automatically extract embedded artwork from FLAC Vorbis Comments and MP3 ID3v2 (APIC) tags.
+
+2. **Terminal Cover Art Rendering**:
+   - Renders album covers directly in the TTY/Console screen using ANSI color blocks via `chafa`.
+   - Gracefully falls back to a clean text-based menu if `chafa` or `mutagen` is not present on the host system.
+
+3. **Headless & Driver-Safe Playback**:
+   - Enforces `mpv` flags (`--vid=no --vo=null --ao=alsa`) to ignore video tracks entirely, preventing crashes caused by headless display driver initialization errors.
+
+4. **Recursive Directory Browsing & Navigation (Move/Switch)**:
+   - Automatically detects the current working directory, parent `Music` / `music` folders, or `/root/music`.
+   - Provides an intuitive album selection menu to freely navigate between artists and folders.
+
+5. **Interactive Playback Controls**:
+   - Press **`q`** or **`Ctrl+C`** during track playback: Immediately stops the song and returns to the track menu.
+   - Press **`m`** on the menu: Switch/move to another album folder.
+   - Press **`q`** on the menu: Exits the player with a clear reminder of how to relaunch it.
 
 ---
 
-## Directory Structure
+## 🛠 Deployment Methods
 
-```text
-.
-├── player.py       # Main Python player script
-└── README.md       # Repository documentation
-Quick Start (Standalone / Testing)
-Prerequisites
-Ensure the following tools are available on your host or target Linux system:
+### Option 1: Standalone CLI Usage
 
-Bash
-# Ubuntu / Debian
-sudo apt install python3 python3-mutagen mpv chafa
-Execution
-Simply run the script in any directory containing music or within a Music parent folder:
+Ideal for testing on desktop Linux distributions (e.g., Ubuntu/Debian), Raspberry Pi OS, or any system with Python 3 installed.
+
+#### 1. Install Prerequisites
+Install the required packages using your system package manager:
+```bash
+# Ubuntu / Debian / Raspberry Pi OS
+sudo apt update
+sudo apt install -y python3 python3-mutagen mpv chafa
+2. Run the Player
+Place player.py in your music directory (e.g., ~/Music) or run it directly from any location:
 
 Bash
 python3 player.py
-Integration with Yocto / OpenEmbedded
-To include pi-player in your Yocto build (e.g., meta-voicehat or meta-pi-agent layer):
+Option 2: Yocto / OpenEmbedded Integration
+Designed for embedding directly into custom Yocto images (e.g., Scarthgap branch), enabling automatic boot to tty1 console and launching the player on root autologin.
 
-1. Recipe Setup (recipes-multimedia/pi-player/pi-player.bb)
+1. Create the Recipe (recipes-multimedia/pi-player/pi-player.bb)
+Add the following recipe to your Yocto layer (e.g., meta-voicehat):
+
 Code snippet
 SUMMARY = "Terminal MP3/FLAC Player with Cover Art support"
 LICENSE = "MIT"
@@ -47,6 +63,7 @@ LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda
 
 SRC_URI = "file://player.py"
 
+# Runtime dependencies
 RDEPENDS:${PN} = " \
     python3-core \
     mpv \
@@ -55,10 +72,11 @@ RDEPENDS:${PN} = " \
 S = "${WORKDIR}"
 
 do_install() {
+    # 1. Install player script to /usr/bin/pi-player
     install -d ${D}${bindir}
     install -m 0755 ${WORKDIR}/player.py ${D}${bindir}/pi-player
 
-    # Automatically launch pi-player on tty1 root autologin
+    # 2. Configure automatic launch on tty1 root login
     install -d ${D}/root
     echo '[ -z "$DISPLAY" ] && [ "$(tty)" = "/dev/tty1" ] && exec pi-player' >> ${D}/root/.profile
 }
@@ -67,14 +85,76 @@ FILES:${PN} += " \
     ${bindir}/pi-player \
     /root/.profile \
 "
-2. Enable in local.conf
-Add pi-player to your image configuration (conf/local.conf):
+Note: Place player.py inside recipes-multimedia/pi-player/files/player.py.
+
+2. Update local.conf
+Append the following configuration to conf/local.conf:
 
 Code snippet
+# Install pi-player into target image
 IMAGE_INSTALL:append = " pi-player"
 
-# Enable root console autologin (optional)
+# Enable root console autologin without password (tty1 / Serial Console)
 GETTY_AUTOLOGIN = "root"
 AUTO_LOGIN = "root"
-License
-This project is open-source under the MIT License.
+3. Build the Image
+Bash
+bitbake core-image-base
+📖 User Guide & Operations
+1. Album Selection Menu
+Upon startup, if multiple album directories are detected under the base path, the player displays an album list:
+
+Plaintext
+=== Available Albums ===
+[ 1] Queen/Greatest Hits
+[ 2] Beatles/Abbey Road
+=========================
+Select album number (1-2) [q to quit]: 1
+Enter a number (1-N): Selects and enters the chosen album folder.
+
+Enter q: Exits the player.
+
+2. Track Selection Menu
+After picking an album, the track list is displayed:
+
+Plaintext
+🎵 🎵 🎵  Current Album: Greatest Hits  🎵 🎵 🎵
+[ 1] 01.Bohemian Rhapsody.flac
+[ 2] 02.Another One Bites The Dust.flac
+[ 3] 03.Killer Queen.flac
+
+Commands: Enter track number | [m] Move/Switch Album | [q] Quit Player
+Selection: 1
+Enter track number (1-N): Starts playing the selected audio file.
+
+Enter m: Returns to the main menu to switch albums.
+
+Enter q: Exits the player.
+
+3. Playback Controls
+Selecting a song renders the embedded cover art and begins audio playback:
+
+Plaintext
+▶ Now Playing: 01.Bohemian Rhapsody.flac
+[Info] Press 'q' or 'Ctrl+C' anytime during playback to return to this menu.
+
+==================================================
+ (Color ANSI cover art rendered here via chafa)
+==================================================
+Press q or Ctrl+C: Instantly stops track playback and returns to the track menu.
+
+Track Completion: Automatically returns to the track menu when the song ends.
+
+4. Exit & Restart Reminder
+Pressing q on any menu exits the script and displays clear relaunch commands:
+
+Plaintext
+==================================================
+ Exited Player.
+ To start the player again, run:
+   $ pi-player
+ or:
+   $ python3 /usr/bin/pi-player
+==================================================
+📄 License
+This project is licensed under the MIT License.
